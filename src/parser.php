@@ -1,108 +1,227 @@
 <?php
 
-function http1_request_parse($request_string) {
+function parseH1Request($request_string) {
+
     $lines = explode("\r\n", $request_string);
-
-    // Extract method, path, and protocol
     list($method, $path, $protocol) = explode(' ', array_shift($lines));
+    $headers = array();
 
-    // Extract body 
-    array_pop($lines);
-    $body = array_pop($lines);
-
-    // Parse headers
-    $headers = [];
-    foreach ($lines as $line) {
+    // Find the index where headers end and body starts
+    $bodyStartIndex = 0;
+    foreach ($lines as $index => $line) {
         if (empty($line)) {
+            $bodyStartIndex = $index + 1;
             break;
         }
+        // Split the line into key-value pair for headers
         list($key, $value) = explode(': ', $line, 2);
         $headers[$key] = $value;
     }
 
-    // // Extract body
-    // $body = implode("\r\n", $lines);
+    // Remove headers from $lines
+    $lines = array_slice($lines, $bodyStartIndex);
 
-    return compact('method', 'path', 'protocol', 'headers', 'body');
+    // Join the remaining lines to form the body
+    $body = implode("\r\n", $lines);
+
+    $parsedRequest = array(
+        'method' => $method,
+        'path' => $path,
+        'protocol' => $protocol,
+        'headers' => $headers,
+        'body' => $body
+    );
+
+    return $parsedRequest;
 }
 
-function http1_to_http2_hex($request_array) {
+function createFrames($request_array) {
+
+    $frame = [];
+    //initializing flags for the frames
+    $END_STREAM_FLAG = 0;
+    $END_HEADERS_FLAG = 0;
+
     if ($request_array['method'] == 'GET') {
-        $hframe = createHeadersFrame($request_array, true);
-        $dframe = "";
+        $END_STREAM_FLAG = 1;
+        $END_HEADERS_FLAG = 1;
+        $frame['headerFrame'] = createHeadersFrame($request_array, $END_STREAM_FLAG, $END_HEADERS_FLAG);
+        $frame['dataFrame'] = [];
     }
     if ($request_array['method'] == 'POST') {
-        $hframe = createHeadersFrame($request_array, false);
-        $dframe = createDataFrame($request_array);
+        $END_HEADERS_FLAG = 1;
+        $frame['headerFrame'] = createHeadersFrame($request_array, $END_STREAM_FLAG, $END_HEADERS_FLAG);
+        $END_STREAM_FLAG = 1;
+        $frame['dataFrame'] = createDataFrame($request_array, $END_STREAM_FLAG, $END_HEADERS_FLAG);
     }
-    // $hframe = replaceHeaderWithInfo($hframe);
-    return $hframe."\n\n".$dframe;
-    // return bin2hex(json_encode($frame));
+    
+    return $frame;
+
 }
+//not set value => field will not be present in the final frame
+function createHeadersFrame($request_array, $END_STREAM_FLAG, $END_HEADERS_FLAG) {
 
-function createHeadersFrame($request_array, $lastFrame) {
+    //flags #=4
+    $PADDED_FLAG = 0;
+    $PRIOR_FLAG = 0;
+    
+    //the frame as an array
+    $frame = [];
 
-    $header_frame = "HEADERS\n";
-    $priorityFlag = 0;
+    //common fields
+    $frame['length'] = "not set"; //24 bits
+    $frame['type'] = "0x1"; //8 bits
+    $frame['flags'] = ['end_stream_flag' => $END_STREAM_FLAG, 'end_header_flag' => $END_HEADERS_FLAG, 'padded_flag' => $PADDED_FLAG, 'prior_flag' => $PRIOR_FLAG]; //8bits
+    $frame['R'] = 0; // semantics of this bit are undefined, must remain unset always //1 bit
+    $frame['streamID'] = bindec(getStreamIdentifier()); // 31 bits
 
-    $type = getTypeInBinary($request_array['method']);
+    //specific fields
+    $frame['padLength'] = "not set"; //8 bits
+    $frame['E'] = "not set"; // 1 bit
+    $frame['StreamDepenedency'] = "not set"; // 31 bits
+    $frame['weight'] = "not set"; // 8 bits
+    $frame['requestHeaders'] = "not set"; 
+    $frame['padding'] = "not set";
 
-    if ($priorityFlag)
-        $streamId = getStreamIdentifier();
-    else
-        $streamId = str_pad(decbin(0), 31, '0', STR_PAD_LEFT);
-
-    if($lastFrame)
-        $flag = getFlagsInBinary(1, 1, 0, 0); //endStream, endHeader, padding, priority
-    else
-        $flag = getFlagsInBinary(0, 1, 0, 0); //endStream, endHeader, padding, priority
-
-    $header_frame .= ":method = ".$request_array['method']."\n";
-    $header_frame .= ":scheme = ".$request_array['protocol']."\n";
-    $header_frame .= ":path = ".$request_array['path']."\n";
+    //Adding request headers as value of the '$frame['requestHeaders']' field
+    $reqHeaders = ":method = ".$request_array['method']."\n";
+    $reqHeaders .= ":scheme = ".$request_array['protocol']."\n";
+    $reqHeaders .= ":path = ".$request_array['path']."\n";
     foreach ($request_array['headers'] as $headerKey => $headerValue) {
-        $header_frame .= $headerKey . " = " . $headerValue . "\n";
+        $reqHeaders .= $headerKey . " = " . $headerValue . "\n";
     }
-    $length = strlen($header_frame) - 8;
-    // Convert the number to 24-bit binary representation
-    $length = str_pad(decbin($length), 24, '0', STR_PAD_LEFT);
-    
 
-    $headerContent = "" . $length . $type . $flag . decbin(0) . $streamId;
-    $count = 1;
-    $header_frame_bin = str_replace("HEADERS", $headerContent, $header_frame, $count);
+    $frame['requestHeaders'] = $reqHeaders; 
+
+    //Updating length field - by counting the length of string(reqHeaders) 
+    $frame['length'] = strlen($reqHeaders);
+
+    //Updating fields based on flags
+    if($PADDED_FLAG == 1) {
+        // $frame['padLength'] = <--value>;
+        // $frame['padding'] = <--value>;
+    }
+    if($PRIOR_FLAG == 1) {
+        // $frame['E'] = <--value>;
+        // $frame['StreamDepenedency'] = <--value>;
+        // $frame['weight'] = <--value>;
+    }
+
+    return $frame;
     
-    return ($headerContent);
-    // return $header_frame_bin;
 }
 
-function createDataFrame($request_array) {
-    $data_frame = "DATA \n+ END_STREAM\n";
-    $data_frame .= $request_array['body'];
-    return $data_frame;
+//not set value => field will not be present in the final frame
+function createDataFrame($request_array, $END_STREAM_FLAG, $END_HEADERS_FLAG) {
+
+    //flags #=4
+    $PADDED_FLAG = 0;
+    $PRIOR_FLAG = 0;
+    
+    //the frame as an array
+    $frame = [];
+
+    //common fields
+    $frame['length'] = "not set"; //24 bits
+    $frame['type'] = "0x0"; //8 bits
+    $frame['flags'] = ['end_stream_flag' => $END_STREAM_FLAG, 'end_header_flag' => $END_HEADERS_FLAG, 'padded_flag' => $PADDED_FLAG, 'prior_flag' => $PRIOR_FLAG]; //8bits
+    $frame['R'] = 0; // semantics of this bit are undefined, must remain unset always //1 bit
+    $frame['streamID'] = bindec(getStreamIdentifier()); // 31 bits
+
+    //specific fields
+    $frame['padLength'] = "not set"; //8 bits
+    $frame['data'] = $request_array['body']; 
+    $frame['padding'] = "not set";
+
+    //Updating length field - by counting the length of string(reqHeaders) 
+    $frame['length'] = strlen($request_array['body']);
+
+    //Updating fields based on flags
+    if($PADDED_FLAG == 1) {
+        // $frame['padLength'] = <--value>;
+        // $frame['padding'] = <--value>;
+    }
+    return $frame;   
+}
+
+function convertFrameToBin($http2_frames) {
+    $frames = [];
+    foreach ($http2_frames as $key => $frame) {
+        // print("\n\n***********************\n\n");
+        if ($frame == [])
+            continue;
+        // print("\n\n***********************\n\n");
+        //converting common frame fields
+        $length = intval($frame['length']);
+        // $len = strlen(decbin());
+        $binString = str_pad(decbin($length), (24), '0', STR_PAD_LEFT);
+        // $binString .= decbin($frame['length']);
+        $frame['length'] = "not set";
+
+        $binString .= getTypeInBinary($frame['type']);
+        $frame['type'] = "not set";
+
+        $binString .= getFlagsInBinary($frame['flags']['end_stream_flag'], $frame['flags']['end_header_flag'], $frame['flags']['padded_flag'], $frame['flags']['prior_flag']);
+        $frame['flags'] = "not set";
+
+        $binString .= str_pad(decbin(0), 1, '0', STR_PAD_LEFT);
+        $frame['R'] = "not set";
+
+        $binString .= getStreamIdentifier();
+        $frame['streamID'] = "not set";
+
+        //looping over remaining fields
+        foreach ($frame as $key => $value) {
+
+            if($value == "not set")
+                continue;
+            $binString .= asciiToBinary($value);
+
+        }
+        //add binary string version of the frame to frames array
+        $frames[] = $binString;
+    }
+    return $frames;
+}
+
+function asciiToBinary($string) {
+    $binaryString = '';
+    for ($i = 0; $i < strlen($string); $i++) {
+        // Get the ASCII value of the character
+        $asciiValue = ord($string[$i]);
+        // Convert the ASCII value to binary and append it to the binary string
+        $binaryString .= decbin($asciiValue);
+    }
+    return $binaryString;
 }
 
 function getTypeInBinary($type) {
-    if ($type == 'GET')
-        return str_pad(decbin(0), 8, '0', STR_PAD_LEFT);
-    if ($type == 'POST')
-        return str_pad(decbin(1), 8, '0', STR_PAD_LEFT);
-    return "00001111"; //invalid
+    if ($type == '0x0')
+        return str_pad(decbin(0), 8, '0', STR_PAD_LEFT);        //DATA
+    if ($type == '0x1')
+        return str_pad(decbin(1), 8, '0', STR_PAD_LEFT);        //HEADERS
+    if ($type == '0x2')
+        return str_pad(decbin(2), 8, '0', STR_PAD_LEFT);        //PRIORITY
+    if ($type == '0x3')
+        return str_pad(decbin(3), 8, '0', STR_PAD_LEFT);        //RST_STREAM
+    if ($type == '0x4')
+        return str_pad(decbin(4), 8, '0', STR_PAD_LEFT);        //SETTINGS
+    if ($type == '0x5')
+        return str_pad(decbin(5), 8, '0', STR_PAD_LEFT);        //PUSH_PROMISE
+    if ($type == '0x6')
+        return str_pad(decbin(6), 8, '0', STR_PAD_LEFT);        //PING
+    if ($type == '0x7')
+        return str_pad(decbin(7), 8, '0', STR_PAD_LEFT);        //GOAWAY
+    if ($type == '0x8')
+        return str_pad(decbin(8), 8, '0', STR_PAD_LEFT);        //WINDOW_UPDATE
+    if ($type == '0x9')
+        return str_pad(decbin(9), 8, '0', STR_PAD_LEFT);        //CONTINUATION
+    else
+        return 00001111;                                        //invalid
 }
 
-// | DATA          | 0x0  |
-// | HEADERS       | 0x1  |
-// | PRIORITY      | 0x2  |
-// | RST_STREAM    | 0x3  |
-// | SETTINGS      | 0x4  |
-// | PUSH_PROMISE  | 0x5  |
-// | PING          | 0x6  |
-// | GOAWAY        | 0x7  |
-// | WINDOW_UPDATE | 0x8  |
-// | CONTINUATION  | 0x9  |
-
 function getStreamIdentifier() {
-    return str_pad(decbin(0), 31, '0', STR_PAD_LEFT);
+    return str_pad(decbin(18943), 31, '0', STR_PAD_LEFT);
 }
 
 function getFlagsInBinary($endStreamFlag, $endHeaderFlag, $paddingFlag, $priorityFlag) {
@@ -119,60 +238,73 @@ function getFlagsInBinary($endStreamFlag, $endHeaderFlag, $paddingFlag, $priorit
     return $bin;
 }
 
-// Function to set a bit to 1 at a specific position
 function setBit($binaryVar, $bitPosition) {
-    // Convert binary string to an array for easy manipulation
     $binaryArray = str_split($binaryVar);
-    
     // Set the specified bit to 1
     $binaryArray[$bitPosition] = '1';
-    
-    // Convert the array back to a binary string
     $binaryVar = implode('', $binaryArray);
     
     return $binaryVar;
 }
 
-// Example usage
+function binToHex($arr) {
+    $hexArr = [];
+    $i = 0;
+    foreach ($arr as $str) {
+        $i = $i + 1;
+        $name = "Frame " . ($i);
+        $chunks = str_split($str, 8);
 
-echo "Example usage 1: \n";
-$http1_request_string = "GET /path HTTP/1.1\r\nHost: example.com\r\n\r\n";
-print("Original request: \n");
+        $hexString = '';
+        foreach ($chunks as $chunk) {
+            $hexString .= " " . sprintf("%02X", bindec($chunk));
+        }
+
+        $hexArr[$name] = $hexString; 
+    }
+    return $hexArr;
+}
+
+// Example usage 1
+
+$http1_request_string = "GET /doc/test.html HTTP/1.1\r\nHost: www.test101.com\r\nAccept: image/gif, image/jpeg, */*\r\nContent-Length: 35\r\n\r\nbookId=12345&author=paulo+Coehlo";
+$request_array = parseH1Request($http1_request_string);
+$http2_frames = createFrames($request_array);
+$bin_msg = convertFrameToBin($http2_frames);
+$hex_msg = binToHex($bin_msg);
+
+// Print the step by step result 
+echo "Example usage 1:" . "\n";
+echo "****************";
+print("\n\nOriginal request: \n\n");
 echo $http1_request_string;
-$request_array = http1_request_parse($http1_request_string);
-$http2_hex_format = http1_to_http2_hex($request_array);
+print("\n\nParsed request array: \n\n");
+print_r($request_array);
+print("\n\nFrames created: \n\n");
+print_r($http2_frames);
+print("\n\nHexadecimal version: \n\n");
+print_r($hex_msg);
+print("\nBinary version: \n\n");
+print_r($bin_msg);
 
-// Output the result
-print("\nConverted request: \n");
-echo $http2_hex_format;
+// Example usage 2
 
-echo "\nExample usage 2: \n";
-$http1_request_string = "POST /resource HTTP/1.1\r\nHost: example.com\r\nContent-Type: image/jpeg\r\nContent-Length: 123 \r\n1010101010101010101010000011001010111101010\r\n";
-print("\nOriginal request: \n");
-echo $http1_request_string;
-$request_array = http1_request_parse($http1_request_string);
-$http2_hex_format = http1_to_http2_hex($request_array);
+$http1_request_string2 = "POST /api/login HTTP/1.1\r\nHost: example.com\r\nContent-Type: application/json\r\nContent-Length: 42\r\nAuthorization: Bearer token123\r\n\r\n{\r\n\"username\": \"example_user\",\r\n\"password\": \"example_password\"\r\n}";
+$request_array2 = parseH1Request($http1_request_string2);
+$http2_frames2 = createFrames($request_array2);
+$bin_msg2 = convertFrameToBin($http2_frames2);
+$hex_msg2 = binToHex($bin_msg2);
 
-// Output the result
-print("\nConverted request: \n");
-echo $http2_hex_format;
-
-// $request = "GET / HTTP/1.1\nHost: www.google.com\nUser-Agent: Apidog/1.0.0 (https://apidog.com)\nAccept: */*\nConnection: keep-alive";
-
-// $lines = explode("\n", $request);
-
-// foreach ($lines as $line) {
-//     print($line . "\n");
-// }
-
-
-//========================================================================
-//pg 57
-// GET /resource HTTP/1.1           HEADERS
-//      Host: example.org          ==>     + END_STREAM
-//      Accept: image/jpeg                 + END_HEADERS
-//                                           :method = GET
-//                                           :scheme = https
-//                                           :path = /resource
-//                                           host = example.org
-//                                           accept = image/jpeg
+// Print the step by step result 
+echo "Example usage 2:" . "\n";
+echo "****************";
+print("\n\nOriginal request: \n\n");
+echo $http2_request_string;
+print("\n\nParsed request array: \n\n");
+print_r($request_array2);
+print("\n\nFrames created: \n\n");
+print_r($http2_frames2);
+print("\n\nHexadecimal version: \n\n");
+print_r($hex_msg2);
+print("\nBinary version: \n\n");
+print_r($bin_msg2);
