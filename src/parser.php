@@ -42,18 +42,18 @@ function createFrames($request_array) {
     $END_STREAM_FLAG = 0;
     $END_HEADERS_FLAG = 0;
 
-    if ($request_array['method'] == 'GET') {
-        $END_STREAM_FLAG = 1;
-        $END_HEADERS_FLAG = 1;
-        $frame['headerFrame'] = createHeadersFrame($request_array, $END_STREAM_FLAG, $END_HEADERS_FLAG);
-        $frame['dataFrame'] = [];
-    }
-    if ($request_array['method'] == 'POST') {
-        $END_HEADERS_FLAG = 1;
-        $frame['headerFrame'] = createHeadersFrame($request_array, $END_STREAM_FLAG, $END_HEADERS_FLAG);
-        $END_STREAM_FLAG = 1;
-        $frame['dataFrame'] = createDataFrame($request_array, $END_STREAM_FLAG, $END_HEADERS_FLAG);
-    }
+    // if ($request_array['method'] == 'GET') {
+    //     $END_STREAM_FLAG = 1;
+    //     $END_HEADERS_FLAG = 1;
+    //     $frame['headerFrame'] = createHeadersFrame($request_array, $END_STREAM_FLAG, $END_HEADERS_FLAG);
+    //     $frame['dataFrame'] = [];
+    // }
+    // if ($request_array['method'] == 'POST') {
+    $END_HEADERS_FLAG = 1;
+    $frame['headerFrame'] = createHeadersFrame($request_array, $END_STREAM_FLAG, $END_HEADERS_FLAG);
+    $END_STREAM_FLAG = 1;
+    $frame['dataFrame'] = createDataFrame($request_array, $END_STREAM_FLAG, $END_HEADERS_FLAG);
+    // }
     
     return $frame;
 

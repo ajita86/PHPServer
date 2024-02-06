@@ -212,7 +212,7 @@ class MailSite
      */
     public function setTimer($time, callable $callback, $repeating = true)
     {
-        $next_time = microtime(true) + $time;
+        $next_time = (int)microtime(true) + $time;
         $this->timers[$next_time] = [$repeating, $time, $callback];
         $this->timer_alarms->insert([$next_time, $next_time]);
         return $next_time;
@@ -1245,7 +1245,7 @@ print_r($allowed_commands);
     protected function parseRset($key, $first_line, $data, &$context)
     {
         $context['SERVER_STATE'] = "EHLO_TLS";
-        unset($context['MAILFROM'], , $context['RCPTTO']);
+        unset($context['MAILFROM'], $context['RCPTTO']);
         $context['RESPONSE'] = "250 OK";
         return 'success';
     }
