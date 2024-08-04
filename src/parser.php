@@ -267,29 +267,30 @@ function binToHex($arr) {
 
 // Example usage 1
 
-$http1_request_string = "GET /doc/test.html HTTP/1.1\r\nHost: www.test101.com\r\nAccept: image/gif, image/jpeg, */*\r\nContent-Length: 35\r\n\r\nbookId=12345&author=paulo+Coehlo";
-$request_array = parseH1Request($http1_request_string);
-$http2_frames = createFrames($request_array);
-$bin_msg = convertFrameToBin($http2_frames);
-$hex_msg = binToHex($bin_msg);
+// $http1_request_string = "GET /doc/test.html HTTP/1.1\r\nHost: www.test101.com\r\nAccept: image/gif, image/jpeg, */*\r\nContent-Length: 35\r\n\r\nbookId=12345&author=paulo+Coehlo";
+// $request_array = parseH1Request($http1_request_string);
+// $http2_frames = createFrames($request_array);
+// $bin_msg = convertFrameToBin($http2_frames);
+// $hex_msg = binToHex($bin_msg);
 
-// Print the step by step result 
-echo "Example usage 1:" . "\n";
-echo "****************";
-print("\n\nOriginal request: \n\n");
-echo $http1_request_string;
-print("\n\nParsed request array: \n\n");
-print_r($request_array);
-print("\n\nFrames created: \n\n");
-print_r($http2_frames);
-print("\n\nHexadecimal version: \n\n");
-print_r($hex_msg);
-print("\nBinary version: \n\n");
-print_r($bin_msg);
+// // Print the step by step result 
+// echo "Example usage 1:" . "\n";
+// echo "****************";
+// print("\n\nOriginal request: \n\n");
+// echo $http1_request_string;
+// print("\n\nParsed request array: \n\n");
+// print_r($request_array);
+// print("\n\nFrames created: \n\n");
+// print_r($http2_frames);
+// print("\n\nHexadecimal version: \n\n");
+// print_r($hex_msg);
+// print("\nBinary version: \n\n");
+// print_r($bin_msg);
 
 // Example usage 2
 
-$http1_request_string2 = "POST /api/login HTTP/1.1\r\nHost: example.com\r\nContent-Type: application/json\r\nContent-Length: 42\r\nAuthorization: Bearer token123\r\n\r\n{\r\n\"username\": \"example_user\",\r\n\"password\": \"example_password\"\r\n}";
+// $http1_request_string2 = "POST /api/login HTTP/1.1\r\nHost: example.com\r\nContent-Type: application/json\r\nContent-Length: 42\r\nAuthorization: Bearer token123\r\n\r\n{\r\n\"username\": \"example_user\",\r\n\"password\": \"example_password\"\r\n}";
+$http1_request_string2 = "GET / HTTP/1.1\r\nHost: yahoo.com\r\n\r\n";
 $request_array2 = parseH1Request($http1_request_string2);
 $http2_frames2 = createFrames($request_array2);
 $bin_msg2 = convertFrameToBin($http2_frames2);
