@@ -1,4 +1,5 @@
 <?php
+
 /**
  * seekquarry\yioop\Website --
  * a small web server and web routing engine
@@ -48,6 +49,9 @@ namespace seekquarry\atto;
  *
  * @author Chris Pollett
  */
+
+require 'Frame.php';
+
 class WebSite
 {
     /*
@@ -198,7 +202,7 @@ class WebSite
      */
     public function __construct($base_path = "")
     {
-        echo "\n\n __construct \n\n";
+        // echo "\n\n __construct \n\n";
         $this->default_server_globals = ["MAX_CACHE_FILESIZE" => 2000000];
         // echo "\n\n default_server_globals \n\n";
         // var_dump($this->default_server_globals);
@@ -230,7 +234,7 @@ class WebSite
      */
     public function isCli()
     {
-        echo "\n\n isCli \n\n";
+        // echo "\n\n isCli \n\n";
         return $this->is_cli;
     }
     /**
@@ -258,7 +262,7 @@ class WebSite
      */
     public function __call($method, $route_callback)
     {
-        echo "\n\n __call \n\n";
+        // echo "\n\n __call \n\n";
         $num_args = count($route_callback);
         $route_name = strtoupper($method);
         if ($num_args < 1 || $num_args > 2 ||
@@ -280,7 +284,7 @@ class WebSite
      */
     public function subsite($route, WebSite $subsite)
     {
-        echo "\n\n subsite \n\n";
+        // echo "\n\n subsite \n\n";
         foreach ($this->http_methods as $method) {
             foreach ($subsite->routes[$method] as $sub_route => $callback) {
                 $this->routes[$method][$route . $sub_route] = $callback;
@@ -299,7 +303,7 @@ class WebSite
      */
     public function addRoute($method, $route, callable $callback)
     {
-        echo "\n\n addRoute \n\n";
+        // echo "\n\n addRoute \n\n";
         if (!isset($this->routes[$method])) {
             throw new \Error("Unknown Router Method");
         } else if (!is_callable($callback)) {
@@ -322,7 +326,7 @@ class WebSite
      */
     public function middleware(callable $callback)
     {
-        echo "\n\n middleware \n\n";
+        // echo "\n\n middleware \n\n";
         $this->middle_wares[] = $callback;
     }
     /**
@@ -331,6 +335,7 @@ class WebSite
      */
     public function process()
     {
+        // echo "\n\n process \n\n";
         if (empty($_SERVER['REQUEST_URI'])) {
             $_SERVER['REQUEST_URI'] = $_SERVER['SCRIPT_NAME'];
         }
@@ -430,7 +435,7 @@ class WebSite
      */
     public function header($header)
     {
-        echo "\n\n header \n\n";
+        // echo "\n\n header \n\n";
         if ($this->isCli()) {
             if (strtolower(substr($header, 0, 5)) == 'http/') {
                 if (strtolower(substr($this->header_data, 0, 5)) == 'http/') {
@@ -469,10 +474,9 @@ class WebSite
      * @param bool $httponly whether or not the cookie is available only over
      *      HTTP, and not available to client-side Javascript
      */
-    public function setCookie($name, $value = "", $expire = 0, $path = "",
-        $domain = "", $secure = false, $httponly = false)
+    public function setCookie($name, $value = "", $expire = 0, $path = "", $domain = "", $secure = false, $httponly = false)
     {
-        echo "\n\n setCookie \n\n";
+        // echo "\n\n setCookie \n\n";
         if ($this->isCli()) {
             if ($secure && !$_SERVER['HTTPS']) {
                 return;
@@ -516,7 +520,7 @@ class WebSite
      */
     public function sessionStart($options = [])
     {
-        echo "\n\n sessionStart \n\n";
+        // echo "\n\n sessionStart \n\n";
         if ($this->isCli()) {
             foreach ($this->session_configs as $key => $value) {
                 if (empty($options[$key])) {
@@ -597,7 +601,7 @@ class WebSite
      */
     public function fileGetContents($filename, $force_read = false)
     {
-        echo "\n\n fileGetContents \n\n";
+        // echo "\n\n fileGetContents \n\n";
         if ($this->isCli()) {
             if (!empty($this->file_cache['PATH'][$filename])) {
                 /*
@@ -666,7 +670,7 @@ class WebSite
      */
     public function filePutContents($filename, $data)
     {
-        echo "\n\n filePutContents \n\n";
+        // echo "\n\n filePutContents \n\n";
         $num_bytes = strlen($data);
         $fits_in_cache =
             $num_bytes < $this->default_server_globals['MAX_CACHE_FILESIZE'];
@@ -706,7 +710,7 @@ class WebSite
      */
     public function clearFileCache()
     {
-        echo "\n\n clearFileCache \n\n";
+        // echo "\n\n clearFileCache \n\n";
         $this->file_cache = ['MARKED' => [], 'UNMARKED' => [], 'PATH' => []];
     }
     /**
@@ -719,7 +723,7 @@ class WebSite
      */
     public function moveUploadedFile($filename , $destination)
     {
-        echo "\n\n moveUploadedFile \n\n";
+        // echo "\n\n moveUploadedFile \n\n";
         if ($this->isCli()) {
             foreach ($_FILES as $key => $file_array) {
                 if ($filename == $file_array['tmp_name']) {
@@ -743,7 +747,7 @@ class WebSite
      */
     function mimeType($file_name, $use_extension = false)
     {
-        echo "\n\n mimeType \n\n";
+        // echo "\n\n mimeType \n\n";
         $mime_type = "unknown";
         $last_chars = "-1";
         if (!$use_extension && !file_exists($file_name)) {
@@ -811,7 +815,7 @@ class WebSite
      */
     public function setTimer($time, callable $callback, $repeating = true)
     {
-        echo "\n\n setTimer \n\n";
+        // echo "\n\n setTimer \n\n";
         if (!$this->isCli()) {
             throw new \Exception("Atto WebSite Timers require CLI execution");
         }
@@ -827,7 +831,7 @@ class WebSite
      */
     public function clearTimer($timer_id)
     {
-        echo "\n\n clearTimer \n\n";
+        // echo "\n\n clearTimer \n\n";
         unset($this->timers[$timer_id]);
     }
     /**
@@ -853,7 +857,7 @@ class WebSite
      */
     public function listen($address, $config_array_or_ini_filename = false)
     {
-        echo "\n\n listen \n\n";
+        // echo "\n\n listen \n\n";
         $path = (!empty($_SERVER['PATH'])) ? $_SERVER['PATH'] :
             ((!empty($_SERVER['Path'])) ? $_SERVER['Path'] : ".");
         $default_server_globals = ["CONNECTION_TIMEOUT" => 20,
@@ -935,9 +939,8 @@ class WebSite
          */
         $context["socket"]["backlog"] = empty($context["socket"]["backlog"]) ?
             200 : $context["socket"]["backlog"];
-        var_dump($context);
         $server_context = stream_context_create($context);
-        print_r(stream_context_get_options($server_context));
+        // var_dump(stream_context_get_options($server_context));
         $server = stream_socket_server($address, $errno, $errstr,
             STREAM_SERVER_BIND|STREAM_SERVER_LISTEN, $server_context);
         if (!$server) {
@@ -996,8 +999,11 @@ class WebSite
                 $micro_timeout = intval(($timeout - floor($pre_timeout))
                     * 1000000);
             }
-            $num_selected = stream_select($in_streams_with_data,
-                $out_streams_with_data, $excepts, $timeout, $micro_timeout);
+            $num_selected = stream_select($in_streams_with_data, $out_streams_with_data, $excepts, $timeout, $micro_timeout);
+            // echo "\nL999\n";
+            // var_dump($num_selected);
+            // var_dump($in_streams_with_data);
+            // var_dump($out_streams_with_data);
             $this->processTimers();
             if ($num_selected > 0) {
                 $this->processRequestStreams($server, $in_streams_with_data);
@@ -1048,7 +1054,7 @@ class WebSite
      */
     public function processInternalRequest($url, $include_headers = false, $post_data = null)
     {
-        echo "\n\n processInternalRequest \n\n";
+        // echo "\n\n processInternalRequest \n\n";
         static $request_context = [];
         if (count($request_context) > 5) {
             return "INTERNAL REQUEST FAILED DUE TO RECURSION";
@@ -1191,7 +1197,7 @@ class WebSite
      */
     protected function checkMatch($request_path, $route)
     {
-        echo "\n\n checkMatch \n\n";
+        // echo "\n\n checkMatch \n\n";
         $add_vars = [];
         $matches = false;
         $magic_string = "PDTSTRTP";
@@ -1225,7 +1231,7 @@ class WebSite
      */
     protected function processTimers()
     {
-        echo "\n\n processTimers \n\n";
+        // echo "\n\n processTimers \n\n";
         if ($this->timer_alarms->isEmpty()) {
             return;
         }
@@ -1267,8 +1273,8 @@ class WebSite
             }
             $meta = stream_get_meta_data($in_stream);
 
-            echo "meta";
-            var_dump($meta);
+            // echo "meta";
+            // var_dump($meta);
 
             $key = (int)$in_stream;
             if ($meta['eof']) {
@@ -1287,29 +1293,51 @@ class WebSite
                     $this->default_server_globals['MAX_IO_LEN'],
                     $max_len - $len));
 
-                echo "data";
-                var_dump($data);
+                // // Check if 'CLIENT_HTTP' exists, if not, initial connection did not yield protocol info, 
+                // //check data for protocol info
+                // if (!isset($this->in_streams[self::CONTEXT][$key]['CLIENT_HTTP'])) {
+                //     $this->in_streams[self::CONTEXT][$key]['CLIENT_HTTP'] = "unknown";
+                // }
+                // $s = $this->in_streams[self::CONTEXT][$key]['CLIENT_HTTP'];
+                // if ($s == "unknown")    $s = $this->checkHttpType($data);
 
             } else {
                 $data = "";
                 $this->initializeBadRequestResponse($key);
             }
-            if ($too_long || $this->parseRequest($key, $data)) {
-                if (!empty($this->in_streams[self::CONTEXT][$key][
-                    'PRE_BAD_RESPONSE'])) {
-                    $this->in_streams[self::CONTEXT][$key]['BAD_RESPONSE'] =
-                        true;
+            echo "\n\nL1301\n\n";
+            if (isset($this->in_streams[self::CONTEXT][$key]['CLIENT_HTTP']) && $this->in_streams[self::CONTEXT][$key]['CLIENT_HTTP'] == "HTTP/2.0") {
+                if($too_long || $this->parseH2Request($key, $data)) {
+                    if (!empty($this->in_streams[self::CONTEXT][$key]['PRE_BAD_RESPONSE'])) {
+                        $this->in_streams[self::CONTEXT][$key]['BAD_RESPONSE'] = true;
+                    }
+                    // $out_data = $this->createEmptyHttp2SettingsFrame();
+                    // @fwrite($in_streams_with_data, $out_data);
+                    // if (empty($this->in_streams[self::CONTEXT][$key]['BAD_RESPONSE'])) {
+                    //     $this->initRequestStream($key);
+                    // }
+                    if (empty($this->out_streams[self::CONNECTION][$key])) {
+                        $this->out_streams[self::CONNECTION][$key] = $in_stream;
+                        $this->out_streams[self::DATA][$key] = $out_data;
+                        $this->out_streams[self::CONTEXT][$key] = $_SERVER;
+                        $this->out_streams[self::MODIFIED_TIME][$key] = time();
+                    }
                 }
-                $out_data = $this->getResponseData();
-                if (empty($this->in_streams[self::CONTEXT][$key][
-                    'BAD_RESPONSE'])) {
-                    $this->initRequestStream($key);
-                }
-                if (empty($this->out_streams[self::CONNECTION][$key])) {
-                    $this->out_streams[self::CONNECTION][$key] = $in_stream;
-                    $this->out_streams[self::DATA][$key] = $out_data;
-                    $this->out_streams[self::CONTEXT][$key] = $_SERVER;
-                    $this->out_streams[self::MODIFIED_TIME][$key] = time();
+            } else {
+                if ($too_long || $this->parseRequest($key, $data)) {
+                    if (!empty($this->in_streams[self::CONTEXT][$key]['PRE_BAD_RESPONSE'])) {
+                        $this->in_streams[self::CONTEXT][$key]['BAD_RESPONSE'] = true;
+                    }
+                    $out_data = $this->getResponseData();
+                    if (empty($this->in_streams[self::CONTEXT][$key]['BAD_RESPONSE'])) {
+                        $this->initRequestStream($key);
+                    }
+                    if (empty($this->out_streams[self::CONNECTION][$key])) {
+                        $this->out_streams[self::CONNECTION][$key] = $in_stream;
+                        $this->out_streams[self::DATA][$key] = $out_data;
+                        $this->out_streams[self::CONTEXT][$key] = $_SERVER;
+                        $this->out_streams[self::MODIFIED_TIME][$key] = time();
+                    }
                 }
             }
             $this->in_streams[self::MODIFIED_TIME][$key] = time();
@@ -1320,57 +1348,57 @@ class WebSite
      * used to check if the server has detected a
      * new connection. In which case, a read stream is set-up.
      *
-     * @param resource $server socket server used to listen for incoming
-     *  connections
+     * @param resource $server Socket server used to listen for incoming connections.
      */
     protected function processServerRequest($server)
     {
         echo "\n\n processServerRequest \n\n";
+
         if ($this->timer_alarms->isEmpty()) {
             $timeout = ini_get("default_socket_timeout");
         } else {
             $next_alarm = $this->timer_alarms->top();
-            $timeout = max(min($next_alarm[0] - microtime(true),
-                ini_get("default_socket_timeout")), 0);
+            $timeout = max(min($next_alarm[0] - microtime(true), ini_get("default_socket_timeout")), 0);
         }
         if ($this->is_secure) {
             stream_set_blocking($server, true);
         }
         $connection = stream_socket_accept($server, $timeout);
+        
         if ($this->is_secure) {
             stream_set_blocking($server, false);
         }
-        if ($connection) {
-            if ($this->is_secure) {
+
+        $stream_start = stream_socket_recvfrom($connection, 256, STREAM_PEEK);
+        $additional_context = !empty($stream_start)
+            ? $this->checkHttpType($stream_start)
+            : ["CLIENT_HTTP" => "unknown"];
+        if($connection) {
+            if ($this->is_secure && $additional_context["CLIENT_HTTP"] !== "HTTP/2.0") {
                 stream_set_blocking($connection, true);
-                $additional_context = $this->checkHttpType($connection);
-                print("\n\nHere\n\n");
-                var_dump($additional_context);
-                var_dump($connection);
-                /////////////////////////////here
                 if (!stream_socket_enable_crypto($connection, true, STREAM_CRYPTO_METHOD_TLS_SERVER)) {
-                    echo "\n\nhere\n\n";
                     $sslError = error_get_last();
-                    var_dump($sslError);
-                    echo ("\n\nSSL Error: " . $sslError['message']);
+                    echo "\n\nSSL Error: " . $sslError['message'] . "\nL1372\n\n";
                     return;
                 }
-                
                 set_error_handler(null);
                 $custom_error_handler = $this->default_server_globals["CUSTOM_ERROR_HANDLER"] ?? null;
                 set_error_handler($custom_error_handler);
-                
                 stream_set_blocking($connection, false);
-            } else {
-                $additional_context = "";
             }
-            
-            $key = (int)$connection;
+            $key = (int) $connection;
             $this->in_streams[self::CONNECTION][$key] = $connection;
-            $this->initRequestStream($key, $additional_context);
+            if ($additional_context["CLIENT_HTTP"] == "unknown") {
+                $additional_context = $this->checkHttpType(stream_socket_recvfrom($connection, 256, STREAM_PEEK));
+            }
+            if ($additional_context["CLIENT_HTTP"] == "HTTP/2.0") {
+                $this->parseH2InitRequest($connection);
+            } else {
+                $this->initRequestStream($key, $additional_context);
+            } 
         }
+        
     }
-
     /**
      * Tries to determine from a connection (as it just starts, provided it
      * is TLS ClientHello message) whether ALPN extension indicate the
@@ -1379,22 +1407,193 @@ class WebSite
      * @param resource $connection a client connection that is just being
      *   initialized before stream_socket_enable_crypto has been called
      */
-    function checkHttpType($connection)
+    function checkHttpType($stream_start)
     {
         echo "\n\n checkHttpType \n\n";
-        echo "hereeee\n\n";
-        $stream_start = stream_socket_recvfrom($connection, 256, STREAM_PEEK);
-        var_dump($stream_start);
-        echo "\n\n";
-        $context = ["CLIENT_HTTP" => "http/1.1"];
+        // if ($data !== "") {
+        //     $stream_start = $data;
+        //     $s = "from request data";
+        // } else {
+        //     $stream_start = stream_socket_recvfrom($connection, 256, STREAM_PEEK);
+        //     $s = "from TLS handshake";
+        // }
+        $s ="from request data";
+        $context = ["CLIENT_HTTP" => "unknown"];
+        // var_dump($stream_start);
+        if (preg_match("/HTTP\/([23])\.0/", $stream_start, $matches)) {
+            if(!empty($matches[0])) {
+                $context["CLIENT_HTTP"] = $matches[0];
+            }
+            // $s = "from TLS handshake";
+        }
         if ( preg_match("/\x00\x10(.){2}.+(h2|h3)/", $stream_start, $matches)) {
-            if(!empty($matches[2])) {
-                $context["CLIENT_HTTP"] = $matches[2];
+            if(!empty($matches[2]) && $matches[2] == "h2") {
+                $context["CLIENT_HTTP"] = "HTTP/2.0";
+                // $s = "from TLS handshake";
             }
         }
-        echo "HTTP version {$context['CLIENT_HTTP']} from TLS handshake\n";
+        if (preg_match("/^((GET|POST|PUT|DELETE|HEAD|OPTIONS|PATCH|TRACE|CONNECT) \S+ HTTP\/1\.1)/", $stream_start, $matches)) {
+            $context["CLIENT_HTTP"] = "HTTP/1.1";
+            // $s = "from request data";
+        }
+        echo "HTTP version {$context['CLIENT_HTTP']} $s\n";
         return $context;
     }
+
+    /**
+     */
+    protected function parseH2InitRequest($connection)
+    {
+        echo "\n\nparseH2InitRequest\n\n";
+        //parse the settings frame received from client
+        $data = stream_socket_recvfrom($connection, 256);
+
+        // echo "\n\nreceived data: \n";
+        // var_dump(bin2hex($data));
+
+        $magic_string = "PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n";
+        $magicStrLen = strlen($magic_string);
+        $rawRcvdFrames = substr($data, $magicStrLen);
+        $rawSettingsHeader = substr($rawRcvdFrames, 0, 9);
+
+        // echo "\n\nreceived Settings Frame Header: \n";
+        // var_dump(bin2hex($rawSettingsHeader));
+
+        list($settingsHeader, $length) = SettingsFrame::parseFrameHeader($rawSettingsHeader);
+        $settingsFrmData = substr($rawRcvdFrames, 9, $length);
+
+        // echo "\n\nreceived Settings Frame data: \n";
+        // var_dump(bin2hex($settingsFrmData));
+    
+        //save settings
+        try {
+            $initialSettingsFrm = new SettingsFrame(0, []);
+            $initialSettingsFrm->parse_body($settingsFrmData);
+            // echo "\n\n parsed settings\n\n";
+            // var_dump($initialSettingsFrm);
+        } catch (Exception $e) {
+            echo "Exception in creating connection preface settings frame: " . $e->getMessage();
+            echo "Exception in parsing body of the received initial settings frame: " . $e->getMessage();
+        }
+       
+        //send initial settings frame
+        try {
+            $out_data = $initialSettingsFrm->serialize();
+            @fwrite($connection, $out_data);
+        } catch (Exception $e) {
+            echo "Exception in encoding and sending connection preface settings frame: " . $e->getMessage();
+        }
+        //receive Window Update
+        //00 00 04 08 00 00 00 00 00 3e 7f 00 01
+        $rcvdWinUpdate = substr($rawRcvdFrames, 9 + $length, 13);
+        // echo "\n\nreceived Window Update: \n";
+        // var_dump(bin2hex($rcvdWinUpdate));
+
+        //receive ACK
+        //send ACK
+        try {
+            $frame = new SettingsFrame(0, []);
+            $frame->flags->add('ACK');
+            $out_data = $frame->serialize();
+            @fwrite($connection, $out_data);
+        } catch (Exception $e) {
+            echo "Caught exception: " . $e->getMessage();
+        }
+
+        //Receive Header frame - GET request
+        $rawHeaderFrame = substr($rawRcvdFrames, 9 + $length + 13);
+        // echo "\n\nreceived Header Frame : \n";
+        // var_dump(bin2hex($rawHeaderFrame));
+        list($headerFrame, $length) = HeaderFrame::parseFrameHeader(substr($rawHeaderFrame, 0 , 9));
+        // echo "\n\nParsed Header Frame headers : \n";
+        // var_dump($headerFrame);
+        $headerFrame_data = substr($rawHeaderFrame, 9, $length);
+
+        // echo "\n\nreceived Header Frame data: length(" . $length . ")\n";
+        // var_dump(bin2hex($headerFrame_data));
+
+        $headerFrame->parseBody($headerFrame_data);
+        echo "\n\nheader frame: \n";
+        var_dump(bin2hex($headerFrame->data));
+
+        // $request = bindec($headerFrame->data);
+        // echo "\n\nparsed Header Frame data: \n";
+        // var_dump(bin2hex($request));
+
+        //Create Response
+        //Send Response 
+        
+        // $this->initH2RequestStream($key, $additional_context);
+    }
+    // /**
+    //  * Initializes an HTTP/2 request stream context.
+    //  *
+    //  * This function sets up the initial stream context for an HTTP/2 connection.
+    //  * The context is used to populate the $_SERVER variable when the request is
+    //  * later processed.
+    //  *
+    //  * @param int $key ID of the request stream to initialize context for
+    //  * @param array $additional_context Any additional key-value pairs to set for the stream's context
+    //  */
+    // protected function initH2RequestStream($key, $additional_context = [])
+    // {
+    //     // Get the connection associated with this stream key
+    //     $connection = $this->in_streams[self::CONNECTION][$key];
+        
+    //     // Get remote and server details
+    //     $remote_name = stream_socket_get_name($connection, true);
+    //     $remote_col = strrpos($remote_name, ":");
+    //     $server_name = stream_socket_get_name($connection, false);
+    //     $server_col = strrpos($server_name, ":");
+
+    //     // Initialize the context with base HTTP/2-specific fields
+    //     $this->in_streams[self::CONTEXT][$key] = [
+    //         self::REQUEST_HEAD => false,
+    //         'REQUEST_METHOD' => false,
+    //         "REMOTE_ADDR" => substr($remote_name, 0, $remote_col),
+    //         "REMOTE_PORT" => substr($remote_name, $remote_col + 1),
+    //         "REQUEST_TIME" => time(),
+    //         "REQUEST_TIME_FLOAT" => microtime(true),
+    //         "SERVER_ADDR" => substr($server_name, 0, $server_col),
+    //         "SERVER_PORT" => substr($server_name, $server_col + 1),
+    //         "HTTP_VERSION" => "2.0",  // Indicate that this is an HTTP/2 connection
+    //         "STREAM_ID" => $key,      // Unique stream ID for HTTP/2
+    //     ];
+
+    //     // Merge any additional context provided
+    //     if (!empty($additional_context)) {
+    //         $this->in_streams[self::CONTEXT][$key] = array_merge(
+    //             $this->in_streams[self::CONTEXT][$key],
+    //             $additional_context
+    //         );
+    //     } else {
+    //         $this->in_streams[self::CONTEXT][$key]['CLIENT_HTTP'] = "HTTP/2.0";
+    //     }
+
+    //     // Initialize the data and modified time for the stream
+    //     $this->in_streams[self::DATA][$key] = "";
+    //     $this->in_streams[self::MODIFIED_TIME][$key] = time();
+    // }
+
+    // private function createEmptyHttp2SettingsFrame($key)
+    // {
+    //     // HTTP/2 settings frame has a 9-byte header followed by a payload.
+    //     // Since we're creating an empty settings frame, the payload will be 0 bytes.
+
+    //     $frame_length = 0; // No payload
+    //     $frame_type = 0x04; // SETTINGS frame type
+    //     $flags = 0x00; // No flags
+    //     $stream_id = 0x0; // Stream ID has to be 0 for initial settings frame
+
+    //     // Pack the frame header
+    //     $frame_header = pack('N', ($frame_length << 8) | $frame_type);
+    //     $frame_header .= pack('C', $flags);
+    //     $frame_header .= pack('N', $stream_id & 0x7FFFFFFF); // Stream ID must be 31-bit
+
+    //     // Since it's an empty frame, we don't need to append any payload
+
+    //     return $frame_header;
+    // }
     /**
      * Gets info about an incoming request stream and uses this to set up
      * an initial stream context. This context is used to populate the $_SERVER
@@ -1406,23 +1605,28 @@ class WebSite
      */
     protected function initRequestStream($key, $additional_context = [])
     {
-        echo "\n\n initRequestStream \n\n";
+        // echo "\n\n initRequestStream \n\n";
         $connection = $this->in_streams[self::CONNECTION][$key];
         $remote_name = stream_socket_get_name($connection, true);
         $remote_col = strrpos($remote_name, ":");
-        $server_name = stream_socket_get_name($connection,
-            false);
+        $server_name = stream_socket_get_name($connection, false);
         $server_col = strrpos($server_name, ":");
-        $this->in_streams[self::CONTEXT][$key] =
-            [self::REQUEST_HEAD => false,
-             'REQUEST_METHOD' => false,
-             "REMOTE_ADDR" => substr($remote_name, 0, $remote_col),
-             "REMOTE_PORT" => substr($remote_name, $remote_col + 1),
-             "REQUEST_TIME" => time(),
-             "REQUEST_TIME_FLOAT" => microtime(true),
-             "SERVER_ADDR" => substr($server_name, 0, $server_col),
-             "SERVER_PORT" => substr($server_name, $server_col + 1),
-             ];
+        $this->in_streams[self::CONTEXT][$key] = [
+            self::REQUEST_HEAD => false,
+            'REQUEST_METHOD' => false,
+            "REMOTE_ADDR" => substr($remote_name, 0, $remote_col),
+            "REMOTE_PORT" => substr($remote_name, $remote_col + 1),
+            "REQUEST_TIME" => time(),
+            "REQUEST_TIME_FLOAT" => microtime(true),
+            "SERVER_ADDR" => substr($server_name, 0, $server_col),
+            "SERVER_PORT" => substr($server_name, $server_col + 1),
+        ];
+        if (empty($additional_context)) {
+            $this->in_streams[self::CONTEXT][$key] = array_merge(
+                $this->in_streams[self::CONTEXT][$key], 
+                ["CLIENT_HTTP" => "unknown"]
+            );
+        }
         $this->in_streams[self::DATA][$key] = "";
         $this->in_streams[self::MODIFIED_TIME][$key] = time();
     }
@@ -1443,6 +1647,8 @@ class WebSite
                 $this->default_server_globals["CUSTOM_ERROR_HANDLER"] ?? null;
             //suppress connection reset notices
             set_error_handler(null);
+            // echo "data\n";
+            // var_dump($data);
             $num_bytes = @fwrite($out_stream, $data);
             set_error_handler($custom_error_handler);
             if ($num_bytes === false) {
@@ -1451,8 +1657,7 @@ class WebSite
                 $remaining_bytes = max(0, strlen($data) - $num_bytes);
             }
             if ($num_bytes > 0) {
-                $this->out_streams[self::DATA][$key] =
-                    substr($data, $num_bytes);
+                $this->out_streams[self::DATA][$key] = substr($data, $num_bytes);
                 $this->out_streams[self::MODIFIED_TIME][$key] = time();
             }
             if ($remaining_bytes == 0) {
@@ -1481,12 +1686,7 @@ class WebSite
      */
     protected function parseRequest($key, $data)
     {
-        // $data = 
-        // string(91) "GET / HTTP/1.1
-        // Host: localhost:8080
-        // User-Agent: curl/8.6.0
-        // Accept: */*
-        // Upgrade: h2c
+        echo "\n\nparseRequest\n\n";
 
         $this->in_streams[self::DATA][$key] .= $data;
         if (strlen($this->in_streams[self::DATA][$key]) <
@@ -1566,44 +1766,6 @@ class WebSite
                 $context[$prefix . $header] = $value;
             }
 
-            // $context = 
-            // array(17) {
-            //     [4]=>
-            //     bool(true)
-            //     ["REQUEST_METHOD"]=>
-            //     string(3) "GET"
-            //     ["REMOTE_ADDR"]=>
-            //     string(9) "127.0.0.1"
-            //     ["REMOTE_PORT"]=>
-            //     string(5) "59545"
-            //     ["REQUEST_TIME"]=>
-            //     int(1721873275)
-            //     ["REQUEST_TIME_FLOAT"]=>
-            //     float(1721873275.271187)
-            //     ["SERVER_ADDR"]=>
-            //     string(9) "127.0.0.1"
-            //     ["SERVER_PORT"]=>
-            //     string(4) "8080"
-            //     ["REQUEST_URI"]=>
-            //     string(1) "/"
-            //     ["SERVER_PROTOCOL"]=>
-            //     string(8) "HTTP/1.1"
-            //     ["PHP_SELF"]=>
-            //     string(1) "/"
-            //     ["QUERY_STRING"]=>
-            //     string(0) ""
-            //     ["SCRIPT_FILENAME"]=>
-            //     string(82) "/Users/ajitashrivastava/Desktop/CS297/myCode/PHPServer/examples/01 Basic Web Page/"
-            //     ["HTTP_HOST"]=>
-            //     string(14) "localhost:8080"
-            //     ["HTTP_USER_AGENT"]=>
-            //     string(10) "curl/8.6.0"
-            //     ["HTTP_ACCEPT"]=>
-            //     string(3) "*/*"
-            //     ["HTTP_UPGRADE"]=>
-            //     string(3) "h2c"
-            //   }
-
             $this->in_streams[self::CONTEXT][$key] = $context;
             if (empty($context['CONTENT_LENGTH'])) {
                 $context['CONTENT'] = "";
@@ -1625,153 +1787,7 @@ class WebSite
         $this->setGlobals($context);
         return true;
     }
-
-    //////////////////////////////////////////////////////////hereeee
-    /**
-     * Takes the string $data recently read from the request stream with
-     * id $key, tacks that on to the previous received data. If this completes
-     * an HTTP request then the request headers and request are parsed
-     *
-     * @param int $key id of request stream to process data for
-     * @param string $data from request stream
-     * @return bool whether the request is complete
-     */
-    protected function parseHttp2Request($key, $data)
-    {
-        // Append the data to the in_streams buffer
-        $this->in_streams[self::DATA][$key] .= $data;
-
-        // Ensure we have enough data to process at least one frame
-        if (strlen($this->in_streams[self::DATA][$key]) < 9) {
-            return false; // HTTP/2 frame header is 9 bytes
-        }
-
-        $context = $this->in_streams[self::CONTEXT][$key];
-
-        // Process frames in the input buffer
-        while (strlen($this->in_streams[self::DATA][$key]) >= 9) {
-            $frameHeader = substr($this->in_streams[self::DATA][$key], 0, 9);
-            list($length, $type, $flags, $streamId) = $this->parseFrameHeader($frameHeader);
-
-            // Ensure we have the full frame data
-            if (strlen($this->in_streams[self::DATA][$key]) < 9 + $length) {
-                return false;
-            }
-
-            $frameData = substr($this->in_streams[self::DATA][$key], 9, $length);
-            $this->in_streams[self::DATA][$key] = substr($this->in_streams[self::DATA][$key], 9 + $length);
-
-            // Handle different frame types
-            switch ($type) {
-                case 0x1: // HEADERS frame
-                    $this->processHeadersFrame($context, $frameData, $flags);
-                    break;
-                case 0x0: // DATA frame
-                    $this->processDataFrame($context, $frameData, $flags);
-                    break;
-                case 0x8: // WINDOW_UPDATE frame
-                    $this->processWindowUpdateFrame($context, $frameData);
-                    break;
-                // Add more case handlers as needed for other frame types
-                default:
-                    // Unhandled frame type
-                    break;
-            }
-
-            // Check if the request is complete
-            if ($context[self::REQUEST_COMPLETE]) {
-                $this->setGlobals($context);
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /**
-     * Parses the frame header for an HTTP/2 frame.
-     *
-     * @param string $frameHeader 9-byte frame header
-     * @return array [length, type, flags, streamId]
-     */
-    private function parseFrameHeader($frameHeader)
-    {
-        $length = (ord($frameHeader[0]) << 16) | (ord($frameHeader[1]) << 8) | ord($frameHeader[2]);
-        $type = ord($frameHeader[3]);
-        $flags = ord($frameHeader[4]);
-        $streamId = (ord($frameHeader[5]) << 24) | (ord($frameHeader[6]) << 16) | (ord($frameHeader[7]) << 8) | ord($frameHeader[8]);
-        $streamId &= 0x7FFFFFFF; // Clear the most significant bit
-        return [$length, $type, $flags, $streamId];
-    }
-
-    /**
-     * Processes an HTTP/2 HEADERS frame.
-     *
-     * @param array $context Request context
-     * @param string $frameData Frame payload
-     * @param int $flags Frame flags
-     */
-    private function processHeadersFrame(&$context, $frameData, $flags)
-    {
-        // Parse the headers using HPACK (HTTP/2 header compression)
-        $headers = $this->hpackDecode($frameData);
-
-        // Store headers in the context
-        foreach ($headers as $header) {
-            list($name, $value) = $header;
-            $context[strtoupper(str_replace('-', '_', $name))] = $value;
-        }
-
-        // Check if the headers are complete
-        if ($flags & 0x4) { // END_HEADERS flag
-            $context[self::REQUEST_HEAD] = true;
-            if ($flags & 0x1) { // END_STREAM flag
-                $context[self::REQUEST_COMPLETE] = true;
-            }
-        }
-    }
-
-    /**
-     * Processes an HTTP/2 DATA frame.
-     *
-     * @param array $context Request context
-     * @param string $frameData Frame payload
-     * @param int $flags Frame flags
-     */
-    private function processDataFrame(&$context, $frameData, $flags)
-    {
-        $context['CONTENT'] .= $frameData;
-
-        // Check if this is the last data frame
-        if ($flags & 0x1) { // END_STREAM flag
-            $context[self::REQUEST_COMPLETE] = true;
-        }
-    }
-
-    /**
-     * Processes an HTTP/2 WINDOW_UPDATE frame.
-     *
-     * @param array $context Request context
-     * @param string $frameData Frame payload
-     */
-    private function processWindowUpdateFrame(&$context, $frameData)
-    {
-        // Update the window size (not shown here)
-    }
-
-    /**
-     * Decodes HTTP/2 headers using HPACK.
-     *
-     * @param string $data Encoded header data
-     * @return array Decoded headers
-     */
-    private function hpackDecode($data)
-    {
-        // Use an HPACK library or implement HPACK decoding (not shown here)
-        return []; // Placeholder
-    }
-
-    //////////////////////////////////////////////////////////hereeee
+    
 
     /**
      * Used to initialize the superglobals before process() is called when
@@ -1793,7 +1809,7 @@ class WebSite
      */
     protected function setGlobals($context)
     {
-        echo "\n\n setGlobals \n\n";
+        // echo "\n\n setGlobals \n\n";
         $_SERVER = array_merge($this->default_server_globals, $context);
         parse_str($context['QUERY_STRING'], $_GET);
         $_POST = [];
@@ -1891,7 +1907,7 @@ class WebSite
      */
     protected function defaultErrorHandler($route = "")
     {   
-        echo "\n\n defaultErrorHandler \n\n";
+        // echo "\n\n defaultErrorHandler \n\n";
         $request_uri = (empty($route) || $route == '/400') ?
             0 : trim($route, "/");
         $error = ($request_uri < 100 || $request_uri > 600) ?
@@ -1908,7 +1924,7 @@ class WebSite
      */
     protected function initializeBadRequestResponse($key)
     {
-        echo "\n\n initializeBadRequestResponse \n\n";
+        // echo "\n\n initializeBadRequestResponse \n\n";
         $_COOKIE = [];
         $_SESSION = [];
         $_FILES = [];
@@ -2010,7 +2026,7 @@ class WebSite
  */
 function webExit($err_msg = "")
 {
-    echo "\n\n webExit \n\n";
+    // echo "\n\n webExit \n\n";
     if (php_sapi_name() == 'cli') {
         throw new WebException($err_msg);
     } else {
