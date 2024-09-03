@@ -3,6 +3,9 @@
 namespace seekquarry\atto;
 
 use Exception;
+use Amp\Http\HPack;
+
+require __DIR__ . "/../vendor/autoload.php";
 
 class Frame {
 
@@ -55,8 +58,6 @@ class Frame {
     // Method to serialize the frame
     public function serialize()
     {
-        echo "\nserialize L57\n";
-        // var_dump($this);
         $body = $this->serialize_body();
         $this->body_len = strlen($body);
 
@@ -76,7 +77,7 @@ class Frame {
             $this->stream_id & 0x7FFFFFFF
         );
 
-        return $header . $body;
+        return ($header . $body);
     }
 
     // Method to parse frame header
@@ -168,29 +169,7 @@ class FrameFactory {
 }
 
 /*
-// Step 1: Create a SettingsFrame instance
-$streamId = 0; // Settings frames usually have stream_id = 0
-$settings = [
-    SettingsFrame::HEADER_TABLE_SIZE => 4096,
-    SettingsFrame::ENABLE_PUSH => 1,
-    SettingsFrame::MAX_CONCURRENT_STREAMS => 100,
-];
-
-$frame = new SettingsFrame($streamId, $settings);
-
-// Step 2: Optionally, set flags (e.g., ACK)
-$frame->flags->add('ACK');
-
-// Step 3: Serialize the frame into a byte string
-$serializedFrame = $frame->serialize();
-
-// The $serializedFrame is now ready to be sent over the network
-
-// Step 4: Parsing a received frame (for example)
-$receivedData =  the byte string received from the network;
-list($parsedFrame, $length) = Frame::parse_frame_header($receivedData);
-
-// Continue processing the parsed frame as needed
+Settings frame class implementation 
  */
 class SettingsFrame extends Frame {
 
@@ -235,12 +214,12 @@ class SettingsFrame extends Frame {
     }
 
     public function serialize_body() {
-        echo "\n\nserialize_body\n\n";
+        // echo "\n\nserialize_body\n\n";
         $body = '';
         foreach ($this->settings as $setting => $value) {
-            echo "\n$setting --> $value\n";
+            // echo "\n$setting --> $value\n";
             $body .= pack('nN', $setting, $value);
-            var_dump(bin2hex($body));
+            // var_dump(bin2hex($body));
         }
         return $body;
     }
@@ -293,7 +272,7 @@ class HeaderFrame extends Frame {
     
     public $data;
 
-    public function __construct(int $stream_id = 0, string $data = '', array $flags = []) {
+    public function __construct(int $stream_id = 0, array $data = [], array $flags = []) {
         parent::__construct($stream_id, $flags);
         $this->data = $data;
     }
@@ -308,38 +287,30 @@ class HeaderFrame extends Frame {
         );
     }
 
-    public function serializeBody() {
-        $padding_data = $this->serialize_padding_data();
-        $padding = str_repeat("\0", $this->pad_length);
+    public function serialize_body() {
+        // $padding_data = $this->serialize_padding_data();
+        // $padding = str_repeat("\0", $this->pad_length);
 
-        if (in_array('PRIORITY', $this->flags)) {
-            $priority_data = $this->serialize_priority_data();
-        } else {
-            $priority_data = '';
+        // if (in_array('PRIORITY', $this->flags)) {
+        //     $priority_data = $this->serialize_priority_data();
+        // } else {
+        //     $priority_data = '';
+        // }
+        $headers = "";
+        if (!empty($this->data)) {
+            $hpack = new HPack();
+            // echo "header array:\n";
+            // var_dump($this->data);
+            // Encode the headers
+            $headers = $hpack->encode($this->data, 4096);
+            // echo "hpack encoded request:\n";
+            // var_dump($headers);
         }
-
-        return implode('', [$padding_data, $priority_data, $this->data, $padding]);
+        return $headers;
+        // return implode('', [$padding_data, $priority_data, $this->data, $padding]);
     }
 
     public function parseBody($data) {
-
-        // $binaryString = pack('H*', bin2hex($data));
-        // $byteArray = unpack('C*', $binaryString);
-
-        // Initialize the HPACK decoder
-        $hpack = new HPack();
-        // Decode the headers
-        $headers = $hpack->decode($data, 4096);
-        // Output the decoded headers
-        foreach ($headers as $name => $value) {
-            echo "$name: $value" . PHP_EOL;
-        }
-        // echo "byte array:\n";
-        // foreach ($byteArray as $index => $byte) {
-        //     echo "Byte {$index}: Decimal: {$byte}, Hex: " . dechex($byte) . PHP_EOL;
-        // }
-        // echo "\n\n";
-        // var_dump($this->flags->getFlags());
 
         // $paddedData_length = $this->parsePaddingData($byteArray);
         // $data = substr($data, $paddedData_length);
@@ -356,6 +327,88 @@ class HeaderFrame extends Frame {
         // if ($this->pad_length && $this->pad_length >= $this->body_len) {
         //     throw new InvalidPaddingError("Padding is too long.");
         // }
+        // Initialize the HPACK decoder
+        $hpack = new HPack();
+        // Decode the headers
+        $headers = $hpack->decode($data, 4096);
+        echo "hpack decoded request:\n";
+        var_dump($headers);
+
+        // Initialize variables for scheme, authority, and path
+        $scheme = '';
+        $authority = '';
+        $path = '';
+
+        foreach ($headers as $header) {
+            switch ($header[0]) {
+                case ":scheme":
+                    $scheme = $header[1];
+                    break;
+                case ":authority":
+                    $authority = $header[1];
+                    break;
+                case ":path":
+                    $path = $header[1];
+                    break;
+            }
+        }
+
+        // Construct the URL
+        $url = $scheme . "://" . $authority . $path;
+        return $url;
+    }
+}
+
+/*
+Data frame class implementation 
+ */
+class DataFrame extends Frame {
+    use Padding;
+
+    protected $defined_flags = [
+        'END_STREAM' => 0x01,
+        'PADDED' => 0x08
+    ];
+
+    protected $type = 0x0;
+    protected $stream_association = '_STREAM_ASSOC_HAS_STREAM';
+    public $data;
+
+    public function __construct(int $stream_id, string $data = '', array $flags = []) {
+        parent::__construct($stream_id, $flags);
+        $this->data = $data;
+    }
+
+    public function serialize_body() {
+        $binaryString = '';
+        
+        // Convert each ASCII character in $this->data to its binary representation
+        for ($i = 0; $i < strlen($this->data); $i++) {
+            $binaryString .= pack('C', ord($this->data[$i]));
+        }
+        // echo "\n\serialize_body: \n";
+        // var_dump(bin2hex($binaryString));
+        // Return the complete binary string
+        return $binaryString;
+    }
+
+    public function parseBody(string $data) {
+        $data = strval($data);
+        $padding_data_length = $this->parsePaddingData($data);
+        $this->data = substr($data, $padding_data_length, strlen($data) - $this->pad_length);
+        $this->body_len = strlen($data);
+
+        if ($this->pad_length && $this->pad_length >= $this->body_len) {
+            throw new InvalidPaddingException("Padding is too long.");
+        }
+    }
+
+    public function getFlowControlledLength() {
+        $padding_len = 0;
+        if (in_array('PADDED', $this->flags)) {
+            $padding_len = $this->pad_length + 1;
+        }
+        return strlen($this->data) + $padding_len;
     }
 }
 
@@ -449,13 +502,13 @@ class Flags {
         return $this->flags;
     }
 
-    /**
-     * Get an iterator for the flags.
-     * @return Traversable
-     */
-    public function getIterator() {
-        return new ArrayIterator($this->flags);
-    }
+    // /**
+    //  * Get an iterator for the flags.
+    //  * @return Traversable
+    //  */
+    // public function getIterator() {
+    //     return new ArrayIterator($this->flags);
+    // }
 }
 
 trait Padding

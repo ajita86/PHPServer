@@ -1037,7 +1037,7 @@ class WebSite
      * Used to handle local web page/HTTP requests made from a running
      * WebSite script  back to itself. For example, if while processing a
      * Website ROUTE, one wanted to do curl request for another local page.
-     * Since WebSite is is single-threaded, such a request would block until the
+     * Since WebSite is single-threaded, such a request would block until the
      * current page was done processing, but as the current page depends on the
      * blocked request, this would cause a deadlock. To avoid this WebSite's
      * should check if a request is local, and if so, call
@@ -1445,52 +1445,39 @@ class WebSite
     protected function parseH2InitRequest($connection)
     {
         echo "\n\nparseH2InitRequest\n\n";
-        //parse the settings frame received from client
+    
+        // Parse the settings frame received from client
         $data = stream_socket_recvfrom($connection, 256);
-
-        // echo "\n\nreceived data: \n";
-        // var_dump(bin2hex($data));
-
+    
         $magic_string = "PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n";
         $magicStrLen = strlen($magic_string);
         $rawRcvdFrames = substr($data, $magicStrLen);
         $rawSettingsHeader = substr($rawRcvdFrames, 0, 9);
-
-        // echo "\n\nreceived Settings Frame Header: \n";
-        // var_dump(bin2hex($rawSettingsHeader));
-
+    
         list($settingsHeader, $length) = SettingsFrame::parseFrameHeader($rawSettingsHeader);
         $settingsFrmData = substr($rawRcvdFrames, 9, $length);
-
-        // echo "\n\nreceived Settings Frame data: \n";
-        // var_dump(bin2hex($settingsFrmData));
     
-        //save settings
+        // Save settings
         try {
             $initialSettingsFrm = new SettingsFrame(0, []);
             $initialSettingsFrm->parse_body($settingsFrmData);
-            // echo "\n\n parsed settings\n\n";
-            // var_dump($initialSettingsFrm);
         } catch (Exception $e) {
             echo "Exception in creating connection preface settings frame: " . $e->getMessage();
             echo "Exception in parsing body of the received initial settings frame: " . $e->getMessage();
         }
-       
-        //send initial settings frame
+    
+        // Send initial settings frame
         try {
             $out_data = $initialSettingsFrm->serialize();
             @fwrite($connection, $out_data);
         } catch (Exception $e) {
             echo "Exception in encoding and sending connection preface settings frame: " . $e->getMessage();
         }
-        //receive Window Update
-        //00 00 04 08 00 00 00 00 00 3e 7f 00 01
+    
+        // Receive Window Update
         $rcvdWinUpdate = substr($rawRcvdFrames, 9 + $length, 13);
-        // echo "\n\nreceived Window Update: \n";
-        // var_dump(bin2hex($rcvdWinUpdate));
-
-        //receive ACK
-        //send ACK
+    
+        // Send ACK
         try {
             $frame = new SettingsFrame(0, []);
             $frame->flags->add('ACK');
@@ -1499,101 +1486,53 @@ class WebSite
         } catch (Exception $e) {
             echo "Caught exception: " . $e->getMessage();
         }
-
-        //Receive Header frame - GET request
+    
+        // Receive Header frame - GET request
         $rawHeaderFrame = substr($rawRcvdFrames, 9 + $length + 13);
-        // echo "\n\nreceived Header Frame : \n";
-        // var_dump(bin2hex($rawHeaderFrame));
-        list($headerFrame, $length) = HeaderFrame::parseFrameHeader(substr($rawHeaderFrame, 0 , 9));
-        // echo "\n\nParsed Header Frame headers : \n";
-        // var_dump($headerFrame);
+        list($headerFrame, $length) = HeaderFrame::parseFrameHeader(substr($rawHeaderFrame, 0, 9));
         $headerFrame_data = substr($rawHeaderFrame, 9, $length);
-
-        // echo "\n\nreceived Header Frame data: length(" . $length . ")\n";
-        // var_dump(bin2hex($headerFrame_data));
-
-        $headerFrame->parseBody($headerFrame_data);
-        echo "\n\nheader frame: \n";
-        var_dump(bin2hex($headerFrame->data));
-
-        // $request = bindec($headerFrame->data);
-        // echo "\n\nparsed Header Frame data: \n";
-        // var_dump(bin2hex($request));
-
-        //Create Response
-        //Send Response 
-        
-        // $this->initH2RequestStream($key, $additional_context);
+    
+        $url = $headerFrame->parseBody($headerFrame_data);
+    
+        // Get Response
+        $response = $this->processInternalRequest($url);
+        // Create response frames
+        if (strlen($response) != 0 && $response != "INTERNAL REQUEST FAILED DUE TO RECURSION") {
+            $messageHeaders = [
+                [":status", "200"],
+                ["content-type", "text/html; charset=utf-8"],
+                ["content-length", strlen($response)]
+            ];
+            $responseHeader = new HeaderFrame($headerFrame->stream_id, $messageHeaders, []);
+            $responseHeader->flags->add("END_HEADERS");
+            $responseHeaderSerialized = $responseHeader->serialize();
+    
+            $responseDataFrame = new DataFrame($headerFrame->stream_id, $response, []);
+            $responseDataFrame->flags->add("END_STREAM");
+            $responseDataFrameSerialized = $responseDataFrame->serialize();
+    
+            $out_data = $responseHeaderSerialized . $responseDataFrameSerialized;
+            // echo "\n\nresponseHeaderSerialized: \n";
+            // var_dump(bin2hex($responseHeaderSerialized));
+            // echo "\n\nresponseDataFrameSerialized: \n";
+            // var_dump(($responseDataFrameSerialized));
+        } else {
+            $messageHeaders = [[":status", "404"]];
+            $responseHeader = new HeaderFrame($headerFrame->stream_id, $messageHeaders, []);
+            $responseHeader->flags->add("END_HEADERS");
+            $responseHeader->flags->add("END_STREAM");
+            $out_data = $responseHeader->serialize();
+        }
+    
+        // Send Response
+        try {
+            @fwrite($connection, $out_data);
+        } catch (Exception $e) {
+            echo "Caught exception: " . $e->getMessage();
+        }
     }
-    // /**
-    //  * Initializes an HTTP/2 request stream context.
-    //  *
-    //  * This function sets up the initial stream context for an HTTP/2 connection.
-    //  * The context is used to populate the $_SERVER variable when the request is
-    //  * later processed.
-    //  *
-    //  * @param int $key ID of the request stream to initialize context for
-    //  * @param array $additional_context Any additional key-value pairs to set for the stream's context
-    //  */
-    // protected function initH2RequestStream($key, $additional_context = [])
-    // {
-    //     // Get the connection associated with this stream key
-    //     $connection = $this->in_streams[self::CONNECTION][$key];
-        
-    //     // Get remote and server details
-    //     $remote_name = stream_socket_get_name($connection, true);
-    //     $remote_col = strrpos($remote_name, ":");
-    //     $server_name = stream_socket_get_name($connection, false);
-    //     $server_col = strrpos($server_name, ":");
-
-    //     // Initialize the context with base HTTP/2-specific fields
-    //     $this->in_streams[self::CONTEXT][$key] = [
-    //         self::REQUEST_HEAD => false,
-    //         'REQUEST_METHOD' => false,
-    //         "REMOTE_ADDR" => substr($remote_name, 0, $remote_col),
-    //         "REMOTE_PORT" => substr($remote_name, $remote_col + 1),
-    //         "REQUEST_TIME" => time(),
-    //         "REQUEST_TIME_FLOAT" => microtime(true),
-    //         "SERVER_ADDR" => substr($server_name, 0, $server_col),
-    //         "SERVER_PORT" => substr($server_name, $server_col + 1),
-    //         "HTTP_VERSION" => "2.0",  // Indicate that this is an HTTP/2 connection
-    //         "STREAM_ID" => $key,      // Unique stream ID for HTTP/2
-    //     ];
-
-    //     // Merge any additional context provided
-    //     if (!empty($additional_context)) {
-    //         $this->in_streams[self::CONTEXT][$key] = array_merge(
-    //             $this->in_streams[self::CONTEXT][$key],
-    //             $additional_context
-    //         );
-    //     } else {
-    //         $this->in_streams[self::CONTEXT][$key]['CLIENT_HTTP'] = "HTTP/2.0";
-    //     }
-
-    //     // Initialize the data and modified time for the stream
-    //     $this->in_streams[self::DATA][$key] = "";
-    //     $this->in_streams[self::MODIFIED_TIME][$key] = time();
-    // }
-
-    // private function createEmptyHttp2SettingsFrame($key)
-    // {
-    //     // HTTP/2 settings frame has a 9-byte header followed by a payload.
-    //     // Since we're creating an empty settings frame, the payload will be 0 bytes.
-
-    //     $frame_length = 0; // No payload
-    //     $frame_type = 0x04; // SETTINGS frame type
-    //     $flags = 0x00; // No flags
-    //     $stream_id = 0x0; // Stream ID has to be 0 for initial settings frame
-
-    //     // Pack the frame header
-    //     $frame_header = pack('N', ($frame_length << 8) | $frame_type);
-    //     $frame_header .= pack('C', $flags);
-    //     $frame_header .= pack('N', $stream_id & 0x7FFFFFFF); // Stream ID must be 31-bit
-
-    //     // Since it's an empty frame, we don't need to append any payload
-
-    //     return $frame_header;
-    // }
+    
+  
     /**
      * Gets info about an incoming request stream and uses this to set up
      * an initial stream context. This context is used to populate the $_SERVER
