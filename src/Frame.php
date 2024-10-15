@@ -2,10 +2,11 @@
 
 namespace seekquarry\atto;
 
+require 'HPack.php';
 use Exception;
-use Amp\Http\HPack;
+// use Amp\Http\HPack;
 
-require __DIR__ . "/../vendor/autoload.php";
+// require __DIR__ . "/../vendor/autoload.php";
 
 class Frame {
 
@@ -83,8 +84,6 @@ class Frame {
     // Method to parse frame header
     public static function parseFrameHeader($header)
     {
-        echo "\n\nparseFrameHeader\n\n";
-
         if (strlen($header) != 9) {
             echo "Invalid frame header: length should be 9, received " . strlen($header);
             return;
@@ -156,15 +155,14 @@ class FrameFactory {
     public static $frames = [
         0x0 => DataFrame::class,
         0x1 => HeaderFrame::class,
-        // 0x2 => PriorityFrame::class,
-        // 0x3 => RstStreamFrame::class,
+        0x2 => PriorityFrame::class,
+        0x3 => RstStreamFrame::class,
         0x4 => SettingsFrame::class,
-        // 0x5 => PushPromiseFrame::class,
-        // 0x6 => PingFrame::class,
-        // 0x7 => GoAwayFrame::class,
-        // 0x8 => WindowUpdateFrame::class,
-        // 0x9 => ContinuationFrame::class,
-        // => AltSvcFrame::class,
+        0x5 => PushPromiseFrame::class,
+        0x6 => PingFrame::class,
+        0x7 => GoAwayFrame::class,
+        0x8 => WindowUpdateFrame::class,
+        0x9 => ContinuationFrame::class,
     ];
 }
 
@@ -191,14 +189,6 @@ class SettingsFrame extends Frame {
     
     protected $settings = [];
 
-    /**
-     * Constructor for SettingsFrame.
-     *
-     * @param int $stream_id
-     * @param array $settings
-     * @param array $flags
-     * @throws InvalidDataError
-     */
     public function __construct(int $stream_id = 0, array $settings = [], array $flags = []) {
         parent::__construct($stream_id, $flags);
 
@@ -214,26 +204,15 @@ class SettingsFrame extends Frame {
     }
 
     public function serialize_body() {
-        // echo "\n\nserialize_body\n\n";
         $body = '';
         foreach ($this->settings as $setting => $value) {
-            // echo "\n$setting --> $value\n";
             $body .= pack('nN', $setting, $value);
-            // var_dump(bin2hex($body));
         }
         return $body;
     }
 
-    /**
-     * Parses body of the frame. Body of SETTINGS frame can contain settings parameters only.
-     * If any of these parameters are found, they are set as settings for the object.
-     * If ACK flag is set, payload must be empty.
-     *
-     * @param string $data
-     */
     public function parse_body($data) {
-        echo "\n\nparseBody\n\n";
-        
+  
         if (in_array('ACK', $this->flags->getFlags()) && strlen($data) > 0) {
             echo "ERROR: SETTINGS ack frame must not have payload: got " . strlen($data) . " bytes";
         }
@@ -246,7 +225,6 @@ class SettingsFrame extends Frame {
             $value = hexdec(substr($entry, 4, 8));
             $identifier_name = SettingsFrame::PAYLOAD_SETTINGS[$identifier] ?? 'UNKNOWN-SETTING';
             $this->settings[$identifier] = $value;
-            // echo "Added $identifier_name with value $value\n";
             $body_len += 6;
         }
         
@@ -288,57 +266,28 @@ class HeaderFrame extends Frame {
     }
 
     public function serialize_body() {
-        // $padding_data = $this->serialize_padding_data();
-        // $padding = str_repeat("\0", $this->pad_length);
-
-        // if (in_array('PRIORITY', $this->flags)) {
-        //     $priority_data = $this->serialize_priority_data();
-        // } else {
-        //     $priority_data = '';
-        // }
+       
         $headers = "";
         if (!empty($this->data)) {
             $hpack = new HPack();
-            // echo "header array:\n";
-            // var_dump($this->data);
-            // Encode the headers
             $headers = $hpack->encode($this->data, 4096);
-            // echo "hpack encoded request:\n";
-            // var_dump($headers);
         }
         return $headers;
-        // return implode('', [$padding_data, $priority_data, $this->data, $padding]);
     }
 
     public function parseBody($data) {
 
-        // $paddedData_length = $this->parsePaddingData($byteArray);
-        // $data = substr($data, $paddedData_length);
-
-        // if (in_array('PRIORITY', $this->flags->getFlags())) {
-        //     $priorityData_length = $this->parsePriorityData($byteArray);
-        // } else {
-        //     $priorityData_length = 0;
-        // }
-
-        // $this->body_len = strlen($data);
-        // $this->data = substr($data, $priorityData_length, $this->body_len - $this->pad_length);
-
-        // if ($this->pad_length && $this->pad_length >= $this->body_len) {
-        //     throw new InvalidPaddingError("Padding is too long.");
-        // }
+        
         // Initialize the HPACK decoder
         $hpack = new HPack();
-        // Decode the headers
         $headers = $hpack->decode($data, 4096);
-        echo "hpack decoded request:\n";
-        var_dump($headers);
-
         // Initialize variables for scheme, authority, and path
         $scheme = '';
         $authority = '';
         $path = '';
-
+        if ($headers == NULL) {
+            return "http://localhost:8080/";
+        }
         foreach ($headers as $header) {
             switch ($header[0]) {
                 case ":scheme":
@@ -360,7 +309,7 @@ class HeaderFrame extends Frame {
 }
 
 /*
-Data frame class implementation 
+ * Data frame class implementation 
  */
 class DataFrame extends Frame {
     use Padding;
@@ -386,9 +335,6 @@ class DataFrame extends Frame {
         for ($i = 0; $i < strlen($this->data); $i++) {
             $binaryString .= pack('C', ord($this->data[$i]));
         }
-        // echo "\n\serialize_body: \n";
-        // var_dump(bin2hex($binaryString));
-        // Return the complete binary string
         return $binaryString;
     }
 
@@ -412,6 +358,289 @@ class DataFrame extends Frame {
     }
 }
 
+/*
+ * Priority frame class implementation 
+ */
+class PriorityFrame extends Priority {
+
+    protected $defined_flags = []; 
+    protected $type = 0x02; 
+    protected $stream_association = '_STREAM_ASSOC_HAS_STREAM';
+
+    protected function bodyRepr() {
+        return sprintf(
+            "exclusive=%s, depends_on=%d, stream_weight=%d",
+            $this->exclusive ? 'true' : 'false',
+            $this->depends_on,
+            $this->stream_weight
+        );
+    }
+
+    public function serializeBody() {
+        return $this->serializePriorityData();
+    }
+
+    public function parseBody(string $data) {
+        if (strlen($data) > 5) {
+            throw new InvalidFrameException(
+                sprintf("PRIORITY must have a 5 byte body: actual length %d.", strlen($data))
+            );
+        }
+
+        $this->parsePriorityData($data);
+        $this->body_len = 5;
+    }
+}
+
+/*
+ * RstStream frame class implementation 
+ */
+class RstStreamFrame extends Frame {
+
+    protected $defined_flags = [];  
+    protected $type = 0x03;  
+    protected $stream_association = '_STREAM_ASSOC_HAS_STREAM';
+    protected $error_code;
+
+    public function __construct(int $stream_id, int $error_code = 0, array $kwargs = []) {
+        parent::__construct($stream_id, $kwargs);
+        $this->error_code = $error_code;
+    }
+
+    protected function bodyRepr() {
+        return sprintf("error_code=%d", $this->error_code);
+    }
+
+    public function serializeBody() {
+        return pack('N', $this->error_code);
+    }
+
+    public function parseBody(string $data) {
+        if (strlen($data) != 4) {
+            throw new InvalidFrameException(
+                sprintf("RST_STREAM must have a 4 byte body: actual length %d.", strlen($data))
+            );
+        }
+
+        $this->error_code = unpack('N', $data)[1];
+        $this->body_len = 4;
+    }
+}
+
+/*
+ * PushPromise frame class implementation 
+ */
+class PushPromiseFrame extends Frame {
+    use Padding;
+
+    protected $defined_flags = [
+        ['name' => 'END_HEADERS', 'value' => 0x04],
+        ['name' => 'PADDED', 'value' => 0x08]
+    ];
+
+    protected $type = 0x05; 
+    protected $stream_association = '_STREAM_ASSOC_HAS_STREAM';
+    protected $promised_stream_id;
+    protected $data;
+
+    public function __construct(int $stream_id, int $promised_stream_id = 0, string $data = '', array $kwargs = []) {
+        parent::__construct($stream_id, $kwargs);
+        $this->promised_stream_id = $promised_stream_id;
+        $this->data = $data;
+    }
+
+    protected function bodyRepr() {
+        return sprintf(
+            "promised_stream_id=%d, data=%s",
+            $this->promised_stream_id,
+            $this->data
+        );
+    }
+
+    public function serializeBody() {
+        $padding_data = $this->serializePaddingData();
+        $padding = str_repeat("\0", $this->pad_length);
+        $data = pack('N', $this->promised_stream_id);
+        return $padding_data . $data . $this->data . $padding;
+    }
+
+    public function parseBody(string $data) {
+        $padding_data_length = $this->parsePaddingData($data);
+
+        if (strlen($data) < $padding_data_length + 4) {
+            throw new InvalidFrameException("Invalid PUSH_PROMISE body");
+        }
+
+        $this->promised_stream_id = unpack('N', substr($data, $padding_data_length, 4))[1];
+        $this->data = substr($data, $padding_data_length + 4, -$this->pad_length);
+
+        if ($this->promised_stream_id == 0 || $this->promised_stream_id % 2 != 0) {
+            throw new InvalidDataException("Invalid PUSH_PROMISE promised stream id: $this->promised_stream_id");
+        }
+
+        if ($this->pad_length && $this->pad_length >= strlen($data)) {
+            throw new InvalidPaddingException("Padding is too long.");
+        }
+
+        $this->body_len = strlen($data);
+    }
+}
+
+/*
+ * Ping frame class implementation 
+ */
+class PingFrame extends Frame {
+
+    protected $defined_flags = [
+        ['name' => 'ACK', 'value' => 0x01]
+    ];
+
+    protected $type = 0x06; 
+    protected $stream_association = '_STREAM_ASSOC_NO_STREAM';
+    protected $opaque_data;
+
+    public function __construct(int $stream_id = 0, string $opaque_data = '', array $kwargs = []) {
+        parent::__construct($stream_id, $kwargs);
+        $this->opaque_data = $opaque_data;
+    }
+
+    protected function bodyRepr() {
+        return sprintf("opaque_data=%s", $this->opaque_data);
+    }
+
+    public function serializeBody() {
+        if (strlen($this->opaque_data) > 8) {
+            throw new InvalidFrameException("PING frame may not have more than 8 bytes of data");
+        }
+
+        return str_pad($this->opaque_data, 8, "\0", STR_PAD_RIGHT);
+    }
+
+    public function parseBody(string $data) {
+        if (strlen($data) != 8) {
+            throw new InvalidFrameException("PING frame must have 8 byte length: got " . strlen($data));
+        }
+        $this->opaque_data = $data;
+        $this->body_len = 8;
+    }
+}
+
+/*
+ * GoAway frame class implementation 
+ */
+class GoAwayFrame extends Frame {
+
+    protected $defined_flags = []; 
+    protected $type = 0x07; 
+    protected $stream_association = '_STREAM_ASSOC_NO_STREAM';
+
+    protected $last_stream_id;
+    protected $error_code;
+    protected $additional_data;
+
+    public function __construct(int $stream_id = 0, int $last_stream_id = 0, int $error_code = 0, string $additional_data = '', array $kwargs = []) {
+        parent::__construct($stream_id, $kwargs);
+        $this->last_stream_id = $last_stream_id;
+        $this->error_code = $error_code;
+        $this->additional_data = $additional_data;
+    }
+
+    protected function bodyRepr() {
+        return sprintf(
+            "last_stream_id=%d, error_code=%d, additional_data=%s",
+            $this->last_stream_id,
+            $this->error_code,
+            $this->additional_data
+        );
+    }
+
+    public function serializeBody() {
+        $data = pack('N', $this->last_stream_id & 0x7FFFFFFF) . pack('N', $this->error_code);
+        return $data . $this->additional_data;
+    }
+
+    public function parseBody(string $data) {
+        if (strlen($data) < 8) {
+            throw new InvalidFrameException("Invalid GOAWAY body.");
+        }
+
+        $this->last_stream_id = unpack('N', substr($data, 0, 4))[1] & 0x7FFFFFFF;
+        $this->error_code = unpack('N', substr($data, 4, 4))[1];
+        $this->additional_data = substr($data, 8);
+        $this->body_len = strlen($data);
+    }
+}
+
+/**
+ * WINDOW_UPDATE frame -- used to implement flow control.
+ */
+class WindowUpdateFrame extends Frame {
+
+    protected $defined_flags = [];
+    protected $type = 0x08; 
+    protected $stream_association = '_STREAM_ASSOC_EITHER';
+    protected $window_increment;
+
+    public function __construct(int $stream_id, int $window_increment = 0, array $kwargs = []) {
+        parent::__construct($stream_id, $kwargs);
+        $this->window_increment = $window_increment;
+    }
+
+    protected function bodyRepr() {
+        return sprintf("window_increment=%d", $this->window_increment);
+    }
+
+    public function serializeBody() {
+        return pack('N', $this->window_increment & 0x7FFFFFFF);
+    }
+
+    public function parseBody(string $data) {
+        if (strlen($data) != 4) {
+            throw new InvalidFrameException("WINDOW_UPDATE frame must have 4 byte length: got " . strlen($data));
+        }
+        $this->window_increment = unpack('N', $data)[1];
+        if ($this->window_increment < 1 || $this->window_increment > (2**31 - 1)) {
+            throw new InvalidDataException("WINDOW_UPDATE increment must be between 1 to 2^31-1");
+        }
+        $this->body_len = 4;
+    }
+}
+
+/**
+ * Continuation frame class implementation.
+ */
+class ContinuationFrame extends Frame {
+
+    protected $defined_flags = [
+        'END_HEADERS' => 0x04,
+    ];
+    protected $type = 0x09;
+    protected $stream_association = self::_STREAM_ASSOC_HAS_STREAM;
+    public $data;
+
+    public function __construct(int $stream_id, string $data = '', array $kwargs = []) {
+        parent::__construct($stream_id, $kwargs);
+        $this->data = $data;
+    }
+
+    protected function _body_repr() {
+        return "data=" . $this->_raw_data_repr($this->data);
+    }
+
+    public function serialize_body() {
+        return $this->data;
+    }
+
+    public function parse_body($data) {
+        $this->data = $data;
+        $this->body_len = strlen($data);
+    }
+}
+
+class InvalidFrameException extends Exception {}
+class InvalidDataException extends Exception {}
+class InvalidPaddingException extends Exception {}
+
 class Flag {
     public string $name;
     public int $bit;
@@ -427,13 +656,7 @@ class Flags {
     private array $validFlags;
     private array $flags;
 
-    /**
-     * Constructor to initialize the valid flags.
-     * @param Flag[] $definedFlags
-     */
     public function __construct(array $definedFlags) {
-        echo "\n\n__construct\n\n";
-        // var_dump($definedFlags);
         $this->validFlags = [];
         foreach ($definedFlags as $name => $bit) {
             $this->validFlags[] = $name;
@@ -441,31 +664,16 @@ class Flags {
         $this->flags = [];
     }
 
-    /**
-     * Represent the object as a string.
-     * @return string
-     */
     public function __toString() {
         $sortedFlags = $this->flags;
         sort($sortedFlags);
         return implode(", ", $sortedFlags);
     }
 
-    /**
-     * Check if a flag is in the set.
-     * @param string $flag
-     * @return bool
-     */
     public function contains(string $flag) {
         return in_array($flag, $this->flags);
     }
 
-    /**
-     * Add a flag to the set.
-     * @param string $flag
-     * @throws InvalidArgumentException
-     * @return void
-     */
     public function add(string $flag) {
         if (!in_array($flag, $this->validFlags)) {
             throw new InvalidArgumentException(sprintf(
@@ -480,19 +688,10 @@ class Flags {
         }
     }
 
-    /**
-     * Remove a flag from the set.
-     * @param string $flag
-     * @return void
-     */
     public function discard(string $flag) {
         $this->flags = array_diff($this->flags, [$flag]);
     }
 
-    /**
-     * Count the number of flags in the set.
-     * @return int
-     */
     public function count() {
         return count($this->flags);
     }
@@ -501,14 +700,6 @@ class Flags {
     public function getFlags() {
         return $this->flags;
     }
-
-    // /**
-    //  * Get an iterator for the flags.
-    //  * @return Traversable
-    //  */
-    // public function getIterator() {
-    //     return new ArrayIterator($this->flags);
-    // }
 }
 
 trait Padding
@@ -536,6 +727,42 @@ trait Padding
             return 1;
         }
         return 0;
+    }
+}
+
+class Priority {
+
+    protected $stream_id;
+    protected $depends_on;
+    protected $stream_weight;
+    protected $exclusive;
+
+    public function __construct(int $stream_id, int $depends_on = 0x0, int $stream_weight = 0x0, bool $exclusive = false, array $kwargs = []) {
+        $this->stream_id = $stream_id;
+        $this->depends_on = $depends_on;
+        $this->stream_weight = $stream_weight;
+        $this->exclusive = $exclusive;
+        if (method_exists($this, 'parent::__construct')) {
+            call_user_func_array('parent::__construct', array_merge([$stream_id], $kwargs));
+        }
+    }
+
+    public function serializePriorityData() {
+        $depends_on_with_exclusive = $this->depends_on + ($this->exclusive ? 0x80000000 : 0);
+        return pack('N C', $depends_on_with_exclusive, $this->stream_weight);
+    }
+
+    public function parsePriorityData(string $data) {
+        if (strlen($data) < 5) {
+            throw new InvalidFrameException("Invalid Priority data");
+        }
+        list($depends_on, $stream_weight) = array_values(unpack('Ndepends_on/Cstream_weight', substr($data, 0, 5)));
+
+        $this->depends_on = $depends_on & 0x7FFFFFFF;
+        $this->stream_weight = $stream_weight;
+        $this->exclusive = (bool)($depends_on >> 31);
+
+        return 5;
     }
 }
 
